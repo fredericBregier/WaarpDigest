@@ -1,21 +1,23 @@
-/**
+/*
+ * Copyright (c) 2019, to individual contributors by the @author tags.
+ * See the COPYRIGHT.txt in the distribution for a full listing of individual contributors.
+ *
  * This file is part of Waarp Project.
- * 
- * Copyright 2009, Frederic Bregier, and individual contributors by the @author tags. See the
- * COPYRIGHT.txt in the distribution for a full listing of individual contributors.
- * 
+ *
  * All Waarp Project is free software: you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by the Free Software Foundation, either version 3 of
  * the License, or (at your option) any later version.
- * 
+ *
  * Waarp is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even
  * the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
  * Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License along with Waarp . If not, see
  * <http://www.gnu.org/licenses/>.
  */
 package org.waarp.common.digest;
+
+import io.netty.buffer.ByteBuf;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -31,8 +33,6 @@ import java.util.Arrays;
 import java.util.zip.Adler32;
 import java.util.zip.CRC32;
 import java.util.zip.Checksum;
-
-import io.netty.buffer.ByteBuf;
 
 /**
  * Class implementing digest like MD5, SHA1. MD5 is based on the Fast MD5 implementation, without C
@@ -63,10 +63,13 @@ public class FilesystemBasedDigest {
      */
     public static final Charset UTF8 = Charset.forName("UTF-8");
 
-    MD5 md5 = null;
-    Checksum checksum = null;
-    MessageDigest digest = null;
-    DigestAlgo algo = null;
+    private static final byte[] salt = { 'G', 'o', 'l', 'd', 'e', 'n', 'G', 'a', 't', 'e' };
+    /**
+     * Should a file MD5 be computed using FastMD5
+     */
+    private static boolean useFastMd5;
+    MD5 md5;
+    Checksum checksum;
 
     /**
      * Constructor of an independent Digest
@@ -154,7 +157,7 @@ public class FilesystemBasedDigest {
         }
     }
 
-    private byte[] reusableBytes = null;
+    MessageDigest digest;
 
     /**
      * Update the digest with new buffer
@@ -225,46 +228,8 @@ public class FilesystemBasedDigest {
         FilesystemBasedDigest.useFastMd5 = useFastMd5;
     }
 
-    /**
-     * All Algo that Digest Class could handle
-     * 
-     * @author Frederic Bregier
-     * 
-     */
-    public static enum DigestAlgo {
-        CRC32("CRC32", 11), ADLER32("ADLER32", 9),
-        MD5("MD5", 16), MD2("MD2", 16), SHA1("SHA-1", 20),
-        SHA256("SHA-256", 32), SHA384("SHA-384", 48), SHA512("SHA-512", 64);
-
-        public String name;
-        public int byteSize;
-
-        /**
-         * 
-         * @return the length in bytes of one Digest
-         */
-        public int getByteSize() {
-            return byteSize;
-        }
-
-        /**
-         * 
-         * @return the length in Hex form of one Digest
-         */
-        public int getHexSize() {
-            return byteSize * 2;
-        }
-
-        private DigestAlgo(String name, int byteSize) {
-            this.name = name;
-            this.byteSize = byteSize;
-        }
-    }
-
-    /**
-     * Should a file MD5 be computed using FastMD5
-     */
-    private static boolean useFastMd5 = false;
+    DigestAlgo algo;
+    private byte[] reusableBytes;
 
     /**
      * 
@@ -630,7 +595,7 @@ public class FilesystemBasedDigest {
      * @return the hexadecimal representation as a String of the array of bytes
      */
     public static final String getHex(byte[] hash) {
-        char buf[] = new char[hash.length * 2];
+        char[] buf = new char[hash.length * 2];
         for (int i = 0, x = 0; i < hash.length; i++) {
             buf[x++] = HEX_CHARS[hash[i] >>> 4 & 0xf];
             buf[x++] = HEX_CHARS[hash[i] & 0xf];
@@ -645,8 +610,8 @@ public class FilesystemBasedDigest {
      * @return the array of bytes representation of the hexadecimal String
      */
     public static final byte[] getFromHex(String hex) {
-        byte from[] = hex.getBytes(UTF8);
-        byte hash[] = new byte[from.length / 2];
+        byte[] from = hex.getBytes(UTF8);
+        byte[] hash = new byte[from.length / 2];
         for (int i = 0, x = 0; i < hash.length; i++) {
             byte code1 = from[x++];
             byte code2 = from[x++];
@@ -665,7 +630,38 @@ public class FilesystemBasedDigest {
         return hash;
     }
 
-    private static byte[] salt = { 'G', 'o', 'l', 'd', 'e', 'n', 'G', 'a', 't', 'e' };
+    /**
+     * All Algo that Digest Class could handle
+     *
+     * @author Frederic Bregier
+     */
+    public enum DigestAlgo {
+        CRC32("CRC32", 11), ADLER32("ADLER32", 9),
+        MD5("MD5", 16), MD2("MD2", 16), SHA1("SHA-1", 20),
+        SHA256("SHA-256", 32), SHA384("SHA-384", 48), SHA512("SHA-512", 64);
+
+        public String name;
+        public int byteSize;
+
+        DigestAlgo(String name, int byteSize) {
+            this.name = name;
+            this.byteSize = byteSize;
+        }
+
+        /**
+         * @return the length in bytes of one Digest
+         */
+        public int getByteSize() {
+            return byteSize;
+        }
+
+        /**
+         * @return the length in Hex form of one Digest
+         */
+        public int getHexSize() {
+            return byteSize * 2;
+        }
+    }
 
     /**
      * Crypt a password

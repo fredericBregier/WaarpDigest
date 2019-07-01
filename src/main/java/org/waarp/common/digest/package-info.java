@@ -1,17 +1,35 @@
+/*
+ * Copyright (c) 2019, to individual contributors by the @author tags.
+ * See the COPYRIGHT.txt in the distribution for a full listing of individual contributors.
+ *
+ * This file is part of Waarp Project.
+ *
+ * All Waarp Project is free software: you can redistribute it and/or modify it under the terms of
+ * the GNU General Public License as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * Waarp is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even
+ * the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+ * Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with Waarp . If not, see
+ * <http://www.gnu.org/licenses/>.
+ */
+
 /**
  * Classes implementing digests support (MD2, MD5, SHA1, SHA-256/384/512, CRC32, ADLER32)<br>
  * <br>
- * 
- * 
+ *
+ *
  * MD5 can be implemented through Fast MD5 implementation, but can be reverted to JVM native digest
  * also.<br>
  * <br>
- * 
+ *
  * Originally a C library support was optional but it is decided to stay full Java.
- * 
+ *
  * Recommendation for best performance would be to use FastMD5 if possible for MD5, but for
  * portability to use native JVM digest implementations (so no FastMD5 at all).
- * 
+ *
  * In order to let you make some choice, here is a short performance reports: (done using java
  * -server option)
  * <ul>
@@ -30,14 +48,14 @@
  * </ul>
  * </ul><br>
  * <br>
- * 
+ *
  * For information, sphlib (http://www.saphir2.com/sphlib/) were compared to native JVM
  * implementation for all those digests, and it appears on small benchmarks (speed from sphlib) that
  * native JVM implementation performs better and that on MD5, FastMD5 performs better than sphlib
  * but less than native JVM.
- * 
+ *
  * Therefore it is recommended to use native JVM MD5 support if possible.
- * 
+ *
  * @apiviz.landmark
  */
 package org.waarp.common.digest;
