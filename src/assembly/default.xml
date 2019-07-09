@@ -37,7 +37,7 @@
         <exclude>${project.build.finalName}*-javadoc.jar</exclude>
       </excludes>
     </fileSet>
-    
+
     <!-- Documentation (API) -->
     <fileSet>
       <directory>target/api</directory>
@@ -46,7 +46,7 @@
         <include>**/**</include>
       </includes>
       <excludes>
-      	<exclude>**/test/**</exclude>
+        <exclude>**/test/**</exclude>
       </excludes>
     </fileSet>
 
@@ -58,7 +58,7 @@
         <include>**/**</include>
       </includes>
       <excludes>
-      	<exclude>**/test/**</exclude>
+        <exclude>**/test/**</exclude>
       </excludes>
     </fileSet>
   </fileSets>
