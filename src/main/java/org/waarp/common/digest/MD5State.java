@@ -1,19 +1,19 @@
 /**
- * Copyright Santeri Paavolainen <sjpaavol@cc.helsinki.fi> and Timothy W Macinta (twm@alum.mit.edu)
- * (optimizations and bug fixes) and individual contributors by the @author tags. See the
- * COPYRIGHT.txt in the distribution for a full listing of individual contributors.
- * 
- * This is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser
- * General Public License as published by the Free Software Foundation; either version 2.1 of the
- * License, or (at your option) any later version.
- * 
- * This software is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Lesser General Public License for more details.
- * 
- * You should have received a copy of the GNU Lesser General Public License along with this
- * software; if not, write to the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
- * Boston, MA 02110-1301 USA, or see the FSF site: http://www.fsf.org.
+ * Copyright Santeri Paavolainen <sjpaavol@cc.helsinki.fi> and Timothy W Macinta (twm@alum.mit.edu) (optimizations and
+ * bug fixes) and individual contributors by the @author tags. See the COPYRIGHT.txt in the distribution for a full
+ * listing of individual contributors.
+ * <p>
+ * This is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any
+ * later version.
+ * <p>
+ * This software is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+ * details.
+ * <p>
+ * You should have received a copy of the GNU Lesser General Public License along with this software; if not, write to
+ * the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA, or see the FSF site:
+ * http://www.fsf.org.
  */
 package org.waarp.common.digest;
 
@@ -38,7 +38,7 @@ package org.waarp.common.digest;
  * <p>
  * Please note: I (Timothy Macinta) have put this code in the com.twmacinta.util package only because it came without a package. I
  * was not the the original author of the code, although I did optimize it (substantially) and fix some bugs.
- * 
+ *
  * @author Santeri Paavolainen <sjpaavol@cc.helsinki.fi>
  * @author Timothy W Macinta (twm@alum.mit.edu) (optimizations and bug fixes)
  **/
@@ -61,7 +61,7 @@ class MD5State {
 
     /**
      * Constructor
-     * 
+     *
      */
     MD5State() {
         buffer = new byte[64];
@@ -77,7 +77,7 @@ class MD5State {
 
     /**
      * Create this State as a copy of another state
-     * 
+     *
      * @param from
      */
     MD5State(MD5State from) {

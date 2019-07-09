@@ -1,14 +1,14 @@
 package org.waarp.common.digest;
 
-import static org.junit.Assert.*;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import org.junit.Test;
+import org.waarp.common.digest.FilesystemBasedDigest.DigestAlgo;
 
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 
-import org.junit.Test;
-import org.waarp.common.digest.FilesystemBasedDigest.DigestAlgo;
+import static org.junit.Assert.*;
 
 public class FilesystemBasedDigestTest {
     private static final String TESTPHRASE = "This is a phrase to test";
@@ -35,7 +35,8 @@ public class FilesystemBasedDigestTest {
                         byte[] bmd52 = digest2.Final();
                         String hex2 = FilesystemBasedDigest.getHex(bmd52);
                         assertTrue(algo + " Hex Not Equals", FilesystemBasedDigest.digestEquals(hex2, bmd52));
-                        assertTrue(algo + " FastMD5 vs MD5 Not Equals", FilesystemBasedDigest.digestEquals(bmd52, bmd5));
+                        assertTrue(algo + " FastMD5 vs MD5 Not Equals",
+                                   FilesystemBasedDigest.digestEquals(bmd52, bmd5));
                         FilesystemBasedDigest.setUseFastMd5(false);
                         ByteBuf buf = Unpooled.wrappedBuffer(TESTPHRASEBYTES);
                         byte[] bmd53 = FilesystemBasedDigest.getHash(buf, algo);
@@ -43,9 +44,9 @@ public class FilesystemBasedDigestTest {
                         String hex3 = FilesystemBasedDigest.getHex(bmd53);
                         assertTrue(algo + " Hex Not Equals", FilesystemBasedDigest.digestEquals(hex3, bmd53));
                         assertTrue(algo + " Through ByteBuf vs Direct Not Equals",
-                                FilesystemBasedDigest.digestEquals(bmd53, bmd5));
+                                   FilesystemBasedDigest.digestEquals(bmd53, bmd5));
                         assertTrue(algo + " FromHex Not Equals",
-                                FilesystemBasedDigest.digestEquals(bmd53, FilesystemBasedDigest.getFromHex(hex3)));
+                                   FilesystemBasedDigest.digestEquals(bmd53, FilesystemBasedDigest.getFromHex(hex3)));
                     }
                     long end = System.currentTimeMillis();
                     System.out.println("Algo: " + algo + " KeyLength: " + bmd5.length + " Time: " + (end - start));

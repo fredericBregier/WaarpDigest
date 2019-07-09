@@ -1,21 +1,23 @@
 /**
- * Copyright Santeri Paavolainen <sjpaavol@cc.helsinki.fi> and Timothy W Macinta (twm@alum.mit.edu)
- * (optimizations and bug fixes) and individual contributors by the @author tags. See the
- * COPYRIGHT.txt in the distribution for a full listing of individual contributors.
- * 
- * This is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser
- * General Public License as published by the Free Software Foundation; either version 2.1 of the
- * License, or (at your option) any later version.
- * 
- * This software is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Lesser General Public License for more details.
- * 
- * You should have received a copy of the GNU Lesser General Public License along with this
- * software; if not, write to the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
- * Boston, MA 02110-1301 USA, or see the FSF site: http://www.fsf.org.
+ * Copyright Santeri Paavolainen <sjpaavol@cc.helsinki.fi> and Timothy W Macinta (twm@alum.mit.edu) (optimizations and
+ * bug fixes) and individual contributors by the @author tags. See the COPYRIGHT.txt in the distribution for a full
+ * listing of individual contributors.
+ * <p>
+ * This is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any
+ * later version.
+ * <p>
+ * This software is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+ * details.
+ * <p>
+ * You should have received a copy of the GNU Lesser General Public License along with this software; if not, write to
+ * the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA, or see the FSF site:
+ * http://www.fsf.org.
  */
 package org.waarp.common.digest;
+
+import io.netty.buffer.ByteBuf;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -26,8 +28,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 import java.util.Arrays;
-
-import io.netty.buffer.ByteBuf;
 
 /**
  * Fast implementation of RSA's MD5 hash generator in Java JDK Beta-2 or higher.
@@ -63,40 +63,36 @@ import io.netty.buffer.ByteBuf;
  * implementation.
  * <p>
  * This class will not use the native C version.
- * 
+ *
  * @author Santeri Paavolainen <sjpaavol@cc.helsinki.fi>
  * @author Timothy W Macinta (twm@alum.mit.edu) (optimizations and bug fixes)
  * @author Frederic Bregier Bregier (add NIO support and dynamic library path loading)
  */
 
 class MD5 {
-    /**
-     * MD5 state
-     */
-    private MD5State state;
-
-    /**
-     * If Final() has been called, finals is set to the current finals state. Any Update() causes
-     * this to be set to null.
-     */
-    private MD5State finals;
-
+    private static final char[] HEX_CHARS = {
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c',
+            'd', 'e', 'f',
+    };
     /**
      * Padding for Final()
      */
     private static byte padding[] = {
             (byte) 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    };
+    private static byte[] salt = { 'G', 'o', 'l', 'd', 'e', 'n', 'G', 'a', 't', 'e' };
     /**
-     * Initialize MD5 internal state (object can be reused just by calling Init() after every
-     * Final()
+     * MD5 state
      */
-    synchronized void Init() {
-        state = new MD5State();
-        finals = null;
-    }
+    private MD5State state;
+    /**
+     * If Final() has been called, finals is set to the current finals state. Any Update() causes
+     * this to be set to null.
+     */
+    private MD5State finals;
+    private byte[] reusableBytes = null;
 
     /**
      * Class constructor
@@ -107,13 +103,269 @@ class MD5 {
 
     /**
      * Initialize class, and update hash with ob.toString()
-     * 
+     *
      * @param ob
      *            Object, ob.toString() is used to update hash after initialization
      */
     MD5(Object ob) {
         this();
         Update(ob.toString());
+    }
+
+    /**
+     * Turns array of bytes into string representing each byte as unsigned hex number.
+     *
+     * @param hash
+     *            Array of bytes to convert to hex-string
+     * @return Generated hex string
+     */
+    static final String asHex(byte hash[]) {
+        char buf[] = new char[hash.length * 2];
+        for (int i = 0, x = 0; i < hash.length; i++) {
+            buf[x++] = HEX_CHARS[hash[i] >>> 4 & 0xf];
+            buf[x++] = HEX_CHARS[hash[i] & 0xf];
+        }
+        return new String(buf);
+    }
+
+    /*
+     * Update()s for other datatypes than byte[] also. Update(byte[], int) is only the main driver.
+     */
+
+    /**
+     * Turns String into array of bytes representing each couple of unsigned hex number as one byte.
+     *
+     * @param buf
+     *            hex string
+     * @return Array of bytes converted from hex-string
+     */
+    static final byte[] asByte(String buf) {
+        byte from[] = buf.getBytes(FilesystemBasedDigest.UTF8);
+        byte hash[] = new byte[from.length / 2];
+        for (int i = 0, x = 0; i < hash.length; i++) {
+            byte code1 = from[x++];
+            byte code2 = from[x++];
+            if (code1 >= HEX_CHARS[10]) {
+                code1 -= HEX_CHARS[10] - 10;
+            } else {
+                code1 -= HEX_CHARS[0];
+            }
+            if (code2 >= HEX_CHARS[10]) {
+                code2 -= HEX_CHARS[10] - 10;
+            } else {
+                code2 -= HEX_CHARS[0];
+            }
+            hash[i] = (byte) ((code1 << 4) + code2);
+        }
+        return hash;
+    }
+
+    /**
+     * Calculates and returns the hash of the contents of the given file.
+     *
+     * @param f
+     *            FileInterface to hash
+     * @return the hash from the given file
+     * @throws IOException
+     **/
+    static byte[] getHash(File f) throws IOException {
+        InputStream close_me = null;
+        try {
+            long buf_size = f.length();
+            if (buf_size < 512) {
+                buf_size = 512;
+            }
+            if (buf_size > 65536) {
+                buf_size = 65536;
+            }
+            byte[] buf = new byte[(int) buf_size];
+            FileInputStream in = new FileInputStream(f);
+            close_me = in;
+            MD5 md5 = new MD5();
+            int read = 0;
+            while ((read = in.read(buf)) >= 0) {
+                md5.Update(md5.state, buf, 0, read);
+            }
+            in.close();
+            in = null;
+            close_me = null;
+            buf = null;
+            buf = md5.Final();
+            return buf;
+        } catch (IOException e) {
+            if (close_me != null) {
+                try {
+                    close_me.close();
+                } catch (Exception e2) {
+                }
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * Calculates and returns the hash of the contents of the given file using Nio file access.
+     *
+     * @param f
+     *            for the FileInterface
+     * @return the hash from the FileInterface with NIO access
+     * @throws IOException
+     **/
+    static byte[] getHashNio(File f) throws IOException {
+        if (!f.exists()) {
+            throw new FileNotFoundException(f.toString());
+        }
+        InputStream close_me = null;
+        try {
+            long buf_size = f.length();
+            if (buf_size < 512) {
+                buf_size = 512;
+            }
+            if (buf_size > 65536) {
+                buf_size = 65536;
+            }
+            byte[] buf = new byte[(int) buf_size];
+
+            @SuppressWarnings("resource")
+            FileInputStream in = new FileInputStream(f);
+            close_me = in;
+            FileChannel fileChannel = in.getChannel();
+            ByteBuffer bb = ByteBuffer.wrap(buf);
+            int read = 0;
+            MD5 md5 = new MD5();
+            read = fileChannel.read(bb);
+            while (read > 0) {
+                md5.Update(md5.state, buf, 0, read);
+                bb.clear();
+                read = fileChannel.read(bb);
+            }
+            fileChannel.close();
+            fileChannel = null;
+            in = null;
+            close_me = null;
+            bb = null;
+            buf = null;
+            buf = md5.Final();
+            md5 = null;
+            return buf;
+        } catch (IOException e) {
+            if (close_me != null) {
+                try {
+                    close_me.close();
+                } catch (Exception e2) {
+                }
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * Calculates and returns the hash of the contents of the given stream.
+     *
+     * @param stream
+     *            Stream to hash
+     * @return the hash from the given stream
+     * @throws IOException
+     **/
+    static byte[] getHash(InputStream stream) throws IOException {
+        try {
+            long buf_size = 65536;
+            byte[] buf = new byte[(int) buf_size];
+            MD5 md5 = new MD5();
+            int read = 0;
+            while ((read = stream.read(buf)) >= 0) {
+                md5.Update(md5.state, buf, 0, read);
+            }
+            stream.close();
+            buf = null;
+            buf = md5.Final();
+            return buf;
+        } catch (IOException e) {
+            if (stream != null) {
+                try {
+                    stream.close();
+                } catch (Exception e2) {
+                }
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * Test if both hashes are equal
+     *
+     * @param hash1
+     * @param hash2
+     * @return true iff the first 16 bytes of both hash1 and hash2 are equal; both hash1 and hash2
+     *         are null; or either hash array is less than 16 bytes in length and their lengths and
+     *         all of their bytes are equal.
+     **/
+    static boolean hashesEqual(byte[] hash1, byte[] hash2) {
+        return Arrays.equals(hash1, hash2);
+    }
+
+    /**
+     * Crypt a password
+     *
+     * @param pwd
+     *            to crypt
+     * @return the crypted password
+     */
+    static final String passwdCrypt(String pwd) {
+        MD5 md5 = new MD5();
+        byte[] bpwd = pwd.getBytes(FilesystemBasedDigest.UTF8);
+        for (int i = 0; i < 16; i++) {
+            md5.Update(md5.state, bpwd, 0, bpwd.length);
+            md5.Update(md5.state, salt, 0, salt.length);
+        }
+        return md5.asHex();
+    }
+
+    /**
+     * Crypt a password
+     *
+     * @param bpwd
+     *            to crypt
+     * @return the crypted password
+     */
+    static final byte[] passwdCrypt(byte[] bpwd) {
+        MD5 md5 = new MD5();
+        for (int i = 0; i < 16; i++) {
+            md5.Update(md5.state, bpwd, 0, bpwd.length);
+            md5.Update(md5.state, salt, 0, salt.length);
+        }
+        return md5.Final();
+    }
+
+    /**
+     *
+     * @param pwd
+     * @param cryptPwd
+     * @return True if the pwd is comparable with the cryptPwd
+     */
+    static final boolean equalPasswd(String pwd, String cryptPwd) {
+        String asHex = passwdCrypt(pwd);
+        return cryptPwd.equals(asHex);
+    }
+
+    /**
+     *
+     * @param pwd
+     * @param cryptPwd
+     * @return True if the pwd is comparable with the cryptPwd
+     */
+    static final boolean equalPasswd(byte[] pwd, byte[] cryptPwd) {
+        byte[] bytes = passwdCrypt(pwd);
+        return Arrays.equals(cryptPwd, bytes);
+    }
+
+    /**
+     * Initialize MD5 internal state (object can be reused just by calling Init() after every
+     * Final()
+     */
+    synchronized void Init() {
+        state = new MD5State();
+        finals = null;
     }
 
     private void Decode(byte buffer[], int shift, int[] out) {
@@ -125,41 +377,41 @@ class MD5 {
 
         // unrolled loop (original loop shown above)
         out[0] = buffer[shift] & 0xff | (buffer[shift + 1] & 0xff) << 8 |
-                (buffer[shift + 2] & 0xff) << 16 | buffer[shift + 3] << 24;
+                 (buffer[shift + 2] & 0xff) << 16 | buffer[shift + 3] << 24;
         out[1] = buffer[shift + 4] & 0xff | (buffer[shift + 5] & 0xff) << 8 |
-                (buffer[shift + 6] & 0xff) << 16 | buffer[shift + 7] << 24;
+                 (buffer[shift + 6] & 0xff) << 16 | buffer[shift + 7] << 24;
         out[2] = buffer[shift + 8] & 0xff | (buffer[shift + 9] & 0xff) << 8 |
-                (buffer[shift + 10] & 0xff) << 16 | buffer[shift + 11] << 24;
+                 (buffer[shift + 10] & 0xff) << 16 | buffer[shift + 11] << 24;
         out[3] = buffer[shift + 12] & 0xff | (buffer[shift + 13] & 0xff) << 8 |
-                (buffer[shift + 14] & 0xff) << 16 | buffer[shift + 15] << 24;
+                 (buffer[shift + 14] & 0xff) << 16 | buffer[shift + 15] << 24;
         out[4] = buffer[shift + 16] & 0xff | (buffer[shift + 17] & 0xff) << 8 |
-                (buffer[shift + 18] & 0xff) << 16 | buffer[shift + 19] << 24;
+                 (buffer[shift + 18] & 0xff) << 16 | buffer[shift + 19] << 24;
         out[5] = buffer[shift + 20] & 0xff | (buffer[shift + 21] & 0xff) << 8 |
-                (buffer[shift + 22] & 0xff) << 16 | buffer[shift + 23] << 24;
+                 (buffer[shift + 22] & 0xff) << 16 | buffer[shift + 23] << 24;
         out[6] = buffer[shift + 24] & 0xff | (buffer[shift + 25] & 0xff) << 8 |
-                (buffer[shift + 26] & 0xff) << 16 | buffer[shift + 27] << 24;
+                 (buffer[shift + 26] & 0xff) << 16 | buffer[shift + 27] << 24;
         out[7] = buffer[shift + 28] & 0xff | (buffer[shift + 29] & 0xff) << 8 |
-                (buffer[shift + 30] & 0xff) << 16 | buffer[shift + 31] << 24;
+                 (buffer[shift + 30] & 0xff) << 16 | buffer[shift + 31] << 24;
         out[8] = buffer[shift + 32] & 0xff | (buffer[shift + 33] & 0xff) << 8 |
-                (buffer[shift + 34] & 0xff) << 16 | buffer[shift + 35] << 24;
+                 (buffer[shift + 34] & 0xff) << 16 | buffer[shift + 35] << 24;
         out[9] = buffer[shift + 36] & 0xff | (buffer[shift + 37] & 0xff) << 8 |
-                (buffer[shift + 38] & 0xff) << 16 | buffer[shift + 39] << 24;
+                 (buffer[shift + 38] & 0xff) << 16 | buffer[shift + 39] << 24;
         out[10] = buffer[shift + 40] & 0xff | (buffer[shift + 41] & 0xff) << 8 |
-                (buffer[shift + 42] & 0xff) << 16 | buffer[shift + 43] << 24;
+                  (buffer[shift + 42] & 0xff) << 16 | buffer[shift + 43] << 24;
         out[11] = buffer[shift + 44] & 0xff | (buffer[shift + 45] & 0xff) << 8 |
-                (buffer[shift + 46] & 0xff) << 16 | buffer[shift + 47] << 24;
+                  (buffer[shift + 46] & 0xff) << 16 | buffer[shift + 47] << 24;
         out[12] = buffer[shift + 48] & 0xff | (buffer[shift + 49] & 0xff) << 8 |
-                (buffer[shift + 50] & 0xff) << 16 | buffer[shift + 51] << 24;
+                  (buffer[shift + 50] & 0xff) << 16 | buffer[shift + 51] << 24;
         out[13] = buffer[shift + 52] & 0xff | (buffer[shift + 53] & 0xff) << 8 |
-                (buffer[shift + 54] & 0xff) << 16 | buffer[shift + 55] << 24;
+                  (buffer[shift + 54] & 0xff) << 16 | buffer[shift + 55] << 24;
         out[14] = buffer[shift + 56] & 0xff | (buffer[shift + 57] & 0xff) << 8 |
-                (buffer[shift + 58] & 0xff) << 16 | buffer[shift + 59] << 24;
+                  (buffer[shift + 58] & 0xff) << 16 | buffer[shift + 59] << 24;
         out[15] = buffer[shift + 60] & 0xff | (buffer[shift + 61] & 0xff) << 8 |
-                (buffer[shift + 62] & 0xff) << 16 | buffer[shift + 63] << 24;
+                  (buffer[shift + 62] & 0xff) << 16 | buffer[shift + 63] << 24;
     }
 
     private void Transform(MD5State stat, byte buffer[], int shift,
-            int[] decode_buf) {
+                           int[] decode_buf) {
         int a = stat.state[0], b = stat.state[1], c = stat.state[2], d = stat.state[3], x[] = decode_buf;
 
         Decode(buffer, shift, decode_buf);
@@ -320,7 +572,7 @@ class MD5 {
 
     /**
      * Updates hash with the bytebuffer given (using at maximum length bytes from that buffer)
-     * 
+     *
      * @param stat
      *            Which state is updated
      * @param buffer
@@ -375,13 +627,9 @@ class MD5 {
         }
     }
 
-    /*
-     * Update()s for other datatypes than byte[] also. Update(byte[], int) is only the main driver.
-     */
-
     /**
      * Plain update, updates this object
-     * 
+     *
      * @param buffer
      * @param offset
      * @param length
@@ -393,7 +641,7 @@ class MD5 {
 
     /**
      * Plain update, updates this object
-     * 
+     *
      * @param buffer
      * @param length
      */
@@ -403,7 +651,7 @@ class MD5 {
 
     /**
      * Updates hash with given array of bytes
-     * 
+     *
      * @param buffer
      *            Array of bytes to use for updating the hash
      */
@@ -413,7 +661,7 @@ class MD5 {
 
     /**
      * Updates hash with a single byte
-     * 
+     *
      * @param b
      *            Single byte to update the hash
      */
@@ -432,7 +680,7 @@ class MD5 {
      * different results on platforms with different default character sets. If a version that works
      * consistently across platforms with different default character sets is desired, use the
      * overloaded version of the Update() method which takes a string and a character encoding.
-     * 
+     *
      * @param s
      *            String to be update to hash (is used as s.getBytes())
      */
@@ -444,7 +692,7 @@ class MD5 {
     /**
      * Update buffer with given string using the given encoding. If the given encoding is null, the
      * encoding "UTF8" is used.
-     * 
+     *
      * @param s
      *            String to be update to hash (is used as s.getBytes(charset_name))
      * @param charset_name
@@ -465,7 +713,7 @@ class MD5 {
 
     /**
      * Update buffer with a single integer (only & 0xff part is used, as a byte)
-     * 
+     *
      * @param i
      *            Integer value, which is then converted to byte as i & 0xff
      */
@@ -474,11 +722,9 @@ class MD5 {
         Update((byte) (i & 0xff));
     }
 
-    private byte[] reusableBytes = null;
-
     /**
      * Updates hash with given {@link ByteBuf} (from Netty)
-     * 
+     *
      * @param buffer
      *            ByteBuf to use for updating the hash and this buffer will not be changed
      */
@@ -519,7 +765,7 @@ class MD5 {
      * Returns array of bytes (16 bytes) representing hash as of the current state of this object.
      * Note: getting a hash does not invalidate the hash object, it only creates a copy of the real
      * state which is finalized.
-     * 
+     *
      * @return Array of 16 bytes, the hash of all updated bytes
      */
     synchronized byte[] Final() {
@@ -531,11 +777,12 @@ class MD5 {
             fin = new MD5State(state);
 
             int[] count_ints = {
-                    (int) (fin.count << 3), (int) (fin.count >> 29) };
+                    (int) (fin.count << 3), (int) (fin.count >> 29)
+            };
             bits = Encode(count_ints, 8);
 
             index = (int) (fin.count & 0x3f);
-            padlen = index < 56 ? 56 - index : 120 - index;
+            padlen = index < 56? 56 - index : 120 - index;
 
             Update(fin, padding, 0, padlen);
             Update(fin, bits, 0, 8);
@@ -547,261 +794,12 @@ class MD5 {
         return Encode(finals.state, 16);
     }
 
-    private static final char[] HEX_CHARS = {
-            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c',
-            'd', 'e', 'f', };
-
-    /**
-     * Turns array of bytes into string representing each byte as unsigned hex number.
-     * 
-     * @param hash
-     *            Array of bytes to convert to hex-string
-     * @return Generated hex string
-     */
-    static final String asHex(byte hash[]) {
-        char buf[] = new char[hash.length * 2];
-        for (int i = 0, x = 0; i < hash.length; i++) {
-            buf[x++] = HEX_CHARS[hash[i] >>> 4 & 0xf];
-            buf[x++] = HEX_CHARS[hash[i] & 0xf];
-        }
-        return new String(buf);
-    }
-
-    /**
-     * Turns String into array of bytes representing each couple of unsigned hex number as one byte.
-     * 
-     * @param buf
-     *            hex string
-     * @return Array of bytes converted from hex-string
-     */
-    static final byte[] asByte(String buf) {
-        byte from[] = buf.getBytes(FilesystemBasedDigest.UTF8);
-        byte hash[] = new byte[from.length / 2];
-        for (int i = 0, x = 0; i < hash.length; i++) {
-            byte code1 = from[x++];
-            byte code2 = from[x++];
-            if (code1 >= HEX_CHARS[10]) {
-                code1 -= HEX_CHARS[10] - 10;
-            } else {
-                code1 -= HEX_CHARS[0];
-            }
-            if (code2 >= HEX_CHARS[10]) {
-                code2 -= HEX_CHARS[10] - 10;
-            } else {
-                code2 -= HEX_CHARS[0];
-            }
-            hash[i] = (byte) ((code1 << 4) + code2);
-        }
-        return hash;
-    }
-
     /**
      * Returns 32-character hex representation of this objects hash
-     * 
+     *
      * @return String of this object's hash
      */
     String asHex() {
         return asHex(Final());
-    }
-
-    /**
-     * Calculates and returns the hash of the contents of the given file.
-     * 
-     * @param f
-     *            FileInterface to hash
-     * @return the hash from the given file
-     * @throws IOException
-     **/
-    static byte[] getHash(File f) throws IOException {
-        InputStream close_me = null;
-        try {
-            long buf_size = f.length();
-            if (buf_size < 512) {
-                buf_size = 512;
-            }
-            if (buf_size > 65536) {
-                buf_size = 65536;
-            }
-            byte[] buf = new byte[(int) buf_size];
-            FileInputStream in = new FileInputStream(f);
-            close_me = in;
-            MD5 md5 = new MD5();
-            int read = 0;
-            while ((read = in.read(buf)) >= 0) {
-                md5.Update(md5.state, buf, 0, read);
-            }
-            in.close();
-            in = null;
-            close_me = null;
-            buf = null;
-            buf = md5.Final();
-            return buf;
-        } catch (IOException e) {
-            if (close_me != null) {
-                try {
-                    close_me.close();
-                } catch (Exception e2) {
-                }
-            }
-            throw e;
-        }
-    }
-
-    /**
-     * Calculates and returns the hash of the contents of the given file using Nio file access.
-     * 
-     * @param f
-     *            for the FileInterface
-     * @return the hash from the FileInterface with NIO access
-     * @throws IOException
-     **/
-    static byte[] getHashNio(File f) throws IOException {
-        if (!f.exists()) {
-            throw new FileNotFoundException(f.toString());
-        }
-        InputStream close_me = null;
-        try {
-            long buf_size = f.length();
-            if (buf_size < 512) {
-                buf_size = 512;
-            }
-            if (buf_size > 65536) {
-                buf_size = 65536;
-            }
-            byte[] buf = new byte[(int) buf_size];
-
-            @SuppressWarnings("resource")
-            FileInputStream in = new FileInputStream(f);
-            close_me = in;
-            FileChannel fileChannel = in.getChannel();
-            ByteBuffer bb = ByteBuffer.wrap(buf);
-            int read = 0;
-            MD5 md5 = new MD5();
-            read = fileChannel.read(bb);
-            while (read > 0) {
-                md5.Update(md5.state, buf, 0, read);
-                bb.clear();
-                read = fileChannel.read(bb);
-            }
-            fileChannel.close();
-            fileChannel = null;
-            in = null;
-            close_me = null;
-            bb = null;
-            buf = null;
-            buf = md5.Final();
-            md5 = null;
-            return buf;
-        } catch (IOException e) {
-            if (close_me != null) {
-                try {
-                    close_me.close();
-                } catch (Exception e2) {
-                }
-            }
-            throw e;
-        }
-    }
-
-    /**
-     * Calculates and returns the hash of the contents of the given stream.
-     * 
-     * @param stream
-     *            Stream to hash
-     * @return the hash from the given stream
-     * @throws IOException
-     **/
-    static byte[] getHash(InputStream stream) throws IOException {
-        try {
-            long buf_size = 65536;
-            byte[] buf = new byte[(int) buf_size];
-            MD5 md5 = new MD5();
-            int read = 0;
-            while ((read = stream.read(buf)) >= 0) {
-                md5.Update(md5.state, buf, 0, read);
-            }
-            stream.close();
-            buf = null;
-            buf = md5.Final();
-            return buf;
-        } catch (IOException e) {
-            if (stream != null) {
-                try {
-                    stream.close();
-                } catch (Exception e2) {
-                }
-            }
-            throw e;
-        }
-    }
-
-    /**
-     * Test if both hashes are equal
-     * 
-     * @param hash1
-     * @param hash2
-     * @return true iff the first 16 bytes of both hash1 and hash2 are equal; both hash1 and hash2
-     *         are null; or either hash array is less than 16 bytes in length and their lengths and
-     *         all of their bytes are equal.
-     **/
-    static boolean hashesEqual(byte[] hash1, byte[] hash2) {
-        return Arrays.equals(hash1, hash2);
-    }
-
-    private static byte[] salt = { 'G', 'o', 'l', 'd', 'e', 'n', 'G', 'a', 't', 'e' };
-
-    /**
-     * Crypt a password
-     * 
-     * @param pwd
-     *            to crypt
-     * @return the crypted password
-     */
-    static final String passwdCrypt(String pwd) {
-        MD5 md5 = new MD5();
-        byte[] bpwd = pwd.getBytes(FilesystemBasedDigest.UTF8);
-        for (int i = 0; i < 16; i++) {
-            md5.Update(md5.state, bpwd, 0, bpwd.length);
-            md5.Update(md5.state, salt, 0, salt.length);
-        }
-        return md5.asHex();
-    }
-
-    /**
-     * Crypt a password
-     * 
-     * @param bpwd
-     *            to crypt
-     * @return the crypted password
-     */
-    static final byte[] passwdCrypt(byte[] bpwd) {
-        MD5 md5 = new MD5();
-        for (int i = 0; i < 16; i++) {
-            md5.Update(md5.state, bpwd, 0, bpwd.length);
-            md5.Update(md5.state, salt, 0, salt.length);
-        }
-        return md5.Final();
-    }
-
-    /**
-     * 
-     * @param pwd
-     * @param cryptPwd
-     * @return True if the pwd is comparable with the cryptPwd
-     */
-    static final boolean equalPasswd(String pwd, String cryptPwd) {
-        String asHex = passwdCrypt(pwd);
-        return cryptPwd.equals(asHex);
-    }
-
-    /**
-     * 
-     * @param pwd
-     * @param cryptPwd
-     * @return True if the pwd is comparable with the cryptPwd
-     */
-    static final boolean equalPasswd(byte[] pwd, byte[] cryptPwd) {
-        byte[] bytes = passwdCrypt(pwd);
-        return Arrays.equals(cryptPwd, bytes);
     }
 }

@@ -1,6 +1,9 @@
 // DO NOT MODIFY - WILL BE OVERWRITTEN DURING THE BUILD PROCESS
 package org.waarp.common.digest;
-/** Provides the version information of Waarp Digest. */
+
+/**
+ * Provides the version information of Waarp Digest.
+ */
 public final class Version {
  /** The version identifier. */
  public static final String ID = "3.0.4";
