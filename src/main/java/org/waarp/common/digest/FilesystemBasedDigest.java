@@ -34,15 +34,16 @@ import java.util.zip.CRC32;
 import java.util.zip.Checksum;
 
 /**
- * Class implementing digest like MD5, SHA1. MD5 is based on the Fast MD5 implementation, without C
- * library support, but can be revert to JVM native digest.<br>
+ * Class implementing digest like MD5, SHA1. MD5 is based on the Fast MD5 implementation, without C library support, but
+ * can be revert to JVM native digest.<br>
  * <br>
- *
+ * <p>
  * Some performance reports: (done using java -server option)
  * <ul>
  * <li>File based only:</li>
  * <ul>
- * <li>FastMD5 in C is almost the fastest (+20%), while FastMD5 in Java is the slowest (-20%) and JVM version is in the middle.</li>
+ * <li>FastMD5 in C is almost the fastest (+20%), while FastMD5 in Java is the slowest (-20%) and JVM version is in the
+ * middle.</li>
  * <li>If ADLER32 is the referenced time ADLER32=1, CRC32=2.5, MD5=4, SHA1=7, SHA256=11, SHA512=25</li>
  * </ul>
  * <li>Buffer based only:</li>
@@ -53,7 +54,6 @@ import java.util.zip.Checksum;
  * </ul>
  *
  * @author Frederic Bregier
- *
  */
 public class FilesystemBasedDigest {
 
@@ -61,6 +61,7 @@ public class FilesystemBasedDigest {
      * Format used for Files
      */
     public static final Charset UTF8 = Charset.forName("UTF-8");
+    public static final String ALGORITHM_NOT_SUPPORTED_BY_THIS_JVM = " Algorithm not supported by this JVM";
     /**
      * Internal representation of Hexadecimal Code
      */
@@ -83,6 +84,7 @@ public class FilesystemBasedDigest {
      * Constructor of an independent Digest
      *
      * @param algo
+     *
      * @throws NoSuchAlgorithmException
      */
     public FilesystemBasedDigest(DigestAlgo algo) throws NoSuchAlgorithmException {
@@ -92,8 +94,8 @@ public class FilesystemBasedDigest {
     /**
      * Initialize the MD5 support
      *
-     * @param mustUseFastMd5
-     *            True will use FastMD5 support, False will use JVM native MD5
+     * @param mustUseFastMd5 True will use FastMD5 support, False will use JVM native MD5
+     *
      * @return True if the native library is loaded
      */
     public static boolean initializeMd5(boolean mustUseFastMd5) {
@@ -116,9 +118,9 @@ public class FilesystemBasedDigest {
     }
 
     /**
-     *
      * @param dig1
      * @param dig2
+     *
      * @return True if the two digest are equals
      */
     public static final boolean digestEquals(byte[] dig1, byte[] dig2) {
@@ -126,9 +128,9 @@ public class FilesystemBasedDigest {
     }
 
     /**
-     *
      * @param dig1
      * @param dig2
+     *
      * @return True if the two digest are equals
      */
     public static final boolean digestEquals(String dig1, byte[] dig2) {
@@ -140,7 +142,9 @@ public class FilesystemBasedDigest {
      * get the byte array of the MD5 for the given FileInterface using Nio access
      *
      * @param f
+     *
      * @return the byte array representing the MD5
+     *
      * @throws IOException
      */
     public static byte[] getHashMd5Nio(File f) throws IOException {
@@ -154,7 +158,9 @@ public class FilesystemBasedDigest {
      * get the byte array of the MD5 for the given FileInterface using standard access
      *
      * @param f
+     *
      * @return the byte array representing the MD5
+     *
      * @throws IOException
      */
     public static byte[] getHashMd5(File f) throws IOException {
@@ -168,7 +174,9 @@ public class FilesystemBasedDigest {
      * get the byte array of the SHA-1 for the given FileInterface using Nio access
      *
      * @param f
+     *
      * @return the byte array representing the SHA-1
+     *
      * @throws IOException
      */
     public static byte[] getHashSha1Nio(File f) throws IOException {
@@ -179,7 +187,9 @@ public class FilesystemBasedDigest {
      * get the byte array of the SHA-1 for the given FileInterface using standard access
      *
      * @param f
+     *
      * @return the byte array representing the SHA-1
+     *
      * @throws IOException
      */
     public static byte[] getHashSha1(File f) throws IOException {
@@ -192,7 +202,9 @@ public class FilesystemBasedDigest {
      * @param in will be closed at the end of this call
      * @param algo
      * @param buf
+     *
      * @return the digest
+     *
      * @throws IOException
      */
     private static byte[] getHashNoNio(InputStream in, DigestAlgo algo, byte[] buf)
@@ -221,13 +233,13 @@ public class FilesystemBasedDigest {
             case SHA256:
             case SHA384:
             case SHA512:
-                String algoname = algo.name;
+                String algoname = algo.getName();
                 MessageDigest digest = null;
                 try {
                     digest = MessageDigest.getInstance(algoname);
                 } catch (NoSuchAlgorithmException e) {
                     throw new IOException(algo +
-                                          " Algorithm not supported by this JVM", e);
+                                          ALGORITHM_NOT_SUPPORTED_BY_THIS_JVM, e);
                 }
                 while ((size = in.read(buf)) >= 0) {
                     digest.update(buf, 0, size);
@@ -237,8 +249,8 @@ public class FilesystemBasedDigest {
                 digest = null;
                 break;
             default:
-                throw new IOException(algo.name +
-                                      " Algorithm not supported by this JVM");
+                throw new IOException(algo.getName() +
+                                      ALGORITHM_NOT_SUPPORTED_BY_THIS_JVM);
             }
         } finally {
             in.close();
@@ -252,7 +264,9 @@ public class FilesystemBasedDigest {
      * @param f
      * @param nio
      * @param algo
+     *
      * @return the digest
+     *
      * @throws IOException
      */
     @SuppressWarnings("resource")
@@ -267,18 +281,17 @@ public class FilesystemBasedDigest {
                 return MD5.getHash(f);
             }
         }
-        InputStream close_me = null;
+        FileInputStream in = null;
         try {
-            long buf_size = f.length();
-            if (buf_size < 512) {
-                buf_size = 512;
+            long bufSize = f.length();
+            if (bufSize < 512) {
+                bufSize = 512;
             }
-            if (buf_size > 65536) {
-                buf_size = 65536;
+            if (bufSize > 65536) {
+                bufSize = 65536;
             }
-            byte[] buf = new byte[(int) buf_size];
-            FileInputStream in = new FileInputStream(f);
-            close_me = in;
+            byte[] buf = new byte[(int) bufSize];
+            in = new FileInputStream(f);
             if (nio) { // NIO
                 FileChannel fileChannel = in.getChannel();
                 try {
@@ -306,13 +319,13 @@ public class FilesystemBasedDigest {
                     case SHA256:
                     case SHA384:
                     case SHA512:
-                        String algoname = algo.name;
+                        String algoname = algo.getName();
                         MessageDigest digest = null;
                         try {
                             digest = MessageDigest.getInstance(algoname);
                         } catch (NoSuchAlgorithmException e) {
                             throw new IOException(algo +
-                                                  " Algorithm not supported by this JVM", e);
+                                                  ALGORITHM_NOT_SUPPORTED_BY_THIS_JVM, e);
                         }
                         while ((size = fileChannel.read(bb)) >= 0) {
                             digest.update(buf, 0, size);
@@ -323,8 +336,8 @@ public class FilesystemBasedDigest {
                         digest = null;
                         break;
                     default:
-                        throw new IOException(algo.name +
-                                              " Algorithm not supported by this JVM");
+                        throw new IOException(algo.getName() +
+                                              ALGORITHM_NOT_SUPPORTED_BY_THIS_JVM);
                     }
                 } finally {
                     fileChannel.close();
@@ -332,19 +345,16 @@ public class FilesystemBasedDigest {
             } else { // Not NIO
                 buf = getHashNoNio(in, algo, buf);
                 in = null;
-                close_me = null;
                 return buf;
             }
             in = null;
-            close_me = null;
             return buf;
-        } catch (IOException e) {
-            throw e;
         } finally {
-            if (close_me != null) {
+            if (in != null) {
                 try {
-                    close_me.close();
+                    in.close();
                 } catch (Exception e2) {
+                    // ignore
                 }
             }
         }
@@ -355,7 +365,9 @@ public class FilesystemBasedDigest {
      *
      * @param stream will be closed at the end of this call
      * @param algo
+     *
      * @return the digest
+     *
      * @throws IOException
      */
     public static byte[] getHash(InputStream stream, DigestAlgo algo) throws IOException {
@@ -366,8 +378,8 @@ public class FilesystemBasedDigest {
             return MD5.getHash(stream);
         }
         try {
-            long buf_size = 65536;
-            byte[] buf = new byte[(int) buf_size];
+            long bufSize = 65536;
+            byte[] buf = new byte[(int) bufSize];
             // Not NIO
             buf = getHashNoNio(stream, algo, buf);
             return buf;
@@ -385,10 +397,11 @@ public class FilesystemBasedDigest {
     /**
      * Get hash with given {@link ByteBuf} (from Netty)
      *
-     * @param buffer
-     *            this buffer will not be changed
+     * @param buffer this buffer will not be changed
      * @param algo
+     *
      * @return the hash
+     *
      * @throws IOException
      */
     public static byte[] getHash(ByteBuf buffer, DigestAlgo algo) throws IOException {
@@ -428,29 +441,29 @@ public class FilesystemBasedDigest {
         case SHA256:
         case SHA384:
         case SHA512:
-            String algoname = algo.name;
+            String algoname = algo.getName();
             MessageDigest digest = null;
             try {
                 digest = MessageDigest.getInstance(algoname);
             } catch (NoSuchAlgorithmException e) {
                 throw new IOException(algoname +
-                                      " Algorithm not supported by this JVM", e);
+                                      ALGORITHM_NOT_SUPPORTED_BY_THIS_JVM, e);
             }
             digest.update(bytes, start, length);
             bytes = digest.digest();
             digest = null;
             return bytes;
         default:
-            throw new IOException(algo.name +
-                                  " Algorithm not supported by this JVM");
+            throw new IOException(algo.getName() +
+                                  ALGORITHM_NOT_SUPPORTED_BY_THIS_JVM);
         }
     }
 
     /**
      * Get hash with given {@link ByteBuf} (from Netty)
      *
-     * @param buffer
-     *            ByteBuf to use to get the hash and this buffer will not be changed
+     * @param buffer ByteBuf to use to get the hash and this buffer will not be changed
+     *
      * @return the hash
      */
     public static byte[] getHashMd5(ByteBuf buffer) {
@@ -469,10 +482,11 @@ public class FilesystemBasedDigest {
      * Get the hexadecimal representation as a String of the array of bytes
      *
      * @param hash
+     *
      * @return the hexadecimal representation as a String of the array of bytes
      */
     public static final String getHex(byte[] hash) {
-        char buf[] = new char[hash.length * 2];
+        char[] buf = new char[hash.length * 2];
         for (int i = 0, x = 0; i < hash.length; i++) {
             buf[x++] = HEX_CHARS[hash[i] >>> 4 & 0xf];
             buf[x++] = HEX_CHARS[hash[i] & 0xf];
@@ -484,11 +498,12 @@ public class FilesystemBasedDigest {
      * Get the array of bytes representation of the hexadecimal String
      *
      * @param hex
+     *
      * @return the array of bytes representation of the hexadecimal String
      */
     public static final byte[] getFromHex(String hex) {
-        byte from[] = hex.getBytes(UTF8);
-        byte hash[] = new byte[from.length / 2];
+        byte[] from = hex.getBytes(UTF8);
+        byte[] hash = new byte[from.length / 2];
         for (int i = 0, x = 0; i < hash.length; i++) {
             byte code1 = from[x++];
             byte code2 = from[x++];
@@ -502,7 +517,7 @@ public class FilesystemBasedDigest {
             } else {
                 code2 -= HEX_CHARS[0];
             }
-            hash[i] = (byte) ((code1 << 4) + code2);
+            hash[i] = (byte) ((code1 << 4) + (code2 & 0xff));
         }
         return hash;
     }
@@ -510,9 +525,10 @@ public class FilesystemBasedDigest {
     /**
      * Crypt a password
      *
-     * @param pwd
-     *            to crypt
+     * @param pwd to crypt
+     *
      * @return the crypted password
+     *
      * @throws IOException
      */
     public static final String passwdCrypt(String pwd) {
@@ -521,7 +537,7 @@ public class FilesystemBasedDigest {
         }
         MessageDigest digest = null;
         try {
-            digest = MessageDigest.getInstance(DigestAlgo.MD5.name);
+            digest = MessageDigest.getInstance(DigestAlgo.MD5.getName());
         } catch (NoSuchAlgorithmException e) {
             return MD5.passwdCrypt(pwd);
         }
@@ -538,9 +554,10 @@ public class FilesystemBasedDigest {
     /**
      * Crypt a password
      *
-     * @param pwd
-     *            to crypt
+     * @param pwd to crypt
+     *
      * @return the crypted password
+     *
      * @throws IOException
      */
     public static final byte[] passwdCrypt(byte[] pwd) {
@@ -549,7 +566,7 @@ public class FilesystemBasedDigest {
         }
         MessageDigest digest = null;
         try {
-            digest = MessageDigest.getInstance(DigestAlgo.MD5.name);
+            digest = MessageDigest.getInstance(DigestAlgo.MD5.getName());
         } catch (NoSuchAlgorithmException e) {
             return MD5.passwdCrypt(pwd);
         }
@@ -563,10 +580,11 @@ public class FilesystemBasedDigest {
     }
 
     /**
-     *
      * @param pwd
      * @param cryptPwd
+     *
      * @return True if the pwd is comparable with the cryptPwd
+     *
      * @throws IOException
      */
     public static final boolean equalPasswd(String pwd, String cryptPwd) {
@@ -576,9 +594,9 @@ public class FilesystemBasedDigest {
     }
 
     /**
-     *
      * @param pwd
      * @param cryptPwd
+     *
      * @return True if the pwd is comparable with the cryptPwd
      */
     public static final boolean equalPasswd(byte[] pwd, byte[] cryptPwd) {
@@ -610,17 +628,17 @@ public class FilesystemBasedDigest {
         case SHA256:
         case SHA384:
         case SHA512:
-            String algoname = algo.name;
+            String algoname = algo.getName();
             try {
                 digest = MessageDigest.getInstance(algoname);
             } catch (NoSuchAlgorithmException e) {
                 throw new NoSuchAlgorithmException(algo +
-                                                   " Algorithm not supported by this JVM", e);
+                                                   ALGORITHM_NOT_SUPPORTED_BY_THIS_JVM, e);
             }
             return;
         default:
-            throw new NoSuchAlgorithmException(algo.name +
-                                               " Algorithm not supported by this JVM");
+            throw new NoSuchAlgorithmException(algo.getName() +
+                                               ALGORITHM_NOT_SUPPORTED_BY_THIS_JVM);
         }
     }
 
@@ -628,6 +646,7 @@ public class FilesystemBasedDigest {
      * (Re)Initialize the digest
      *
      * @param algo
+     *
      * @throws NoSuchAlgorithmException
      */
     public void initialize(DigestAlgo algo) throws NoSuchAlgorithmException {
@@ -684,7 +703,6 @@ public class FilesystemBasedDigest {
     }
 
     /**
-     *
      * @return the digest in array of bytes
      */
     public byte[] Final() {
@@ -703,30 +721,28 @@ public class FilesystemBasedDigest {
         case SHA512:
             return digest.digest();
         }
-        return null;
+        return new byte[0];
     }
 
     /**
      * All Algo that Digest Class could handle
      *
      * @author Frederic Bregier
-     *
      */
     public static enum DigestAlgo {
         CRC32("CRC32", 11), ADLER32("ADLER32", 9),
         MD5("MD5", 16), MD2("MD2", 16), SHA1("SHA-1", 20),
         SHA256("SHA-256", 32), SHA384("SHA-384", 48), SHA512("SHA-512", 64);
 
-        public String name;
-        public int byteSize;
+        private final String algoName;
+        private final int byteSize;
 
         private DigestAlgo(String name, int byteSize) {
-            this.name = name;
+            this.algoName = name;
             this.byteSize = byteSize;
         }
 
         /**
-         *
          * @return the length in bytes of one Digest
          */
         public int getByteSize() {
@@ -734,11 +750,14 @@ public class FilesystemBasedDigest {
         }
 
         /**
-         *
          * @return the length in Hex form of one Digest
          */
         public int getHexSize() {
-            return byteSize * 2;
+            return getByteSize() * 2;
+        }
+
+        public String getName() {
+            return algoName;
         }
     }
 
